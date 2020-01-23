@@ -14,6 +14,12 @@ namespace RuleEngine
 {
     public static class RuleEngine
     {
+        public static Dictionary<string, Func<dynamic, dynamic, bool>> actions = new Dictionary<string, Func<dynamic, dynamic, bool>>()
+        {
+            { "and", (a, b) => { return a & b; } },
+            { "or", (a, b) => { return a | b; } }
+        };
+
         [FunctionName("RuleEngine")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
@@ -26,10 +32,9 @@ namespace RuleEngine
 
             dynamic ProjectData = data?.data;
             dynamic rules = data?.rules;
-            log.LogInformation($"===================> {RuleEngine.RuleEval(ProjectData, rules, log)}");
 
             return data != null
-                ? (ActionResult)new OkObjectResult($"Hello, {RuleEngine.RuleEval(ProjectData, rules, log)}")
+                ? (ActionResult)new OkObjectResult($"Hello, {RuleEngine.RuleEval(ProjectData, rules, log) }")
                 : new BadRequestObjectResult("Please pass a data on the query string or in the request body");
         }
         public static object GetPropValue(object src, string propName)
@@ -47,7 +52,6 @@ namespace RuleEngine
             if (!data.ContainsKey(pathlist[0]))
                 return null;
 
-            Console.WriteLine($"========= {pathlist[0]}");
             return pathlist.Length == 1 ? data[pathlist[0]] : RuleEngine.GetValue(data[pathlist[0]], pathlist[1]);
         }
 
@@ -65,16 +69,22 @@ namespace RuleEngine
             if (compare == "eql")
                 return value == targetValue;
 
+            if (compare == "uneql")
+                return value != targetValue;
+
             return false;
         }
 
         public static bool RuleMatch(dynamic data, dynamic rule)
         {
-            if (rule.ContainsKey("criteria"))
+            if (rule.ContainsKey("criteria") && rule["criteria"] != null)
             {
+                //if (!rule.ContainsKey("operator"))
+                //    throw "WTF";
+
                 bool match = true;
                 foreach (var criteria in rule["criteria"])
-                    match &= RuleEngine.RuleMatch(data, criteria);
+                    match = RuleEngine.actions[(string)rule["operator"]](match, RuleEngine.RuleMatch(data, criteria));
 
                 return match;
             }
@@ -89,8 +99,10 @@ namespace RuleEngine
             foreach (var rule in rules)
             {
                 log.LogInformation($"{rule}");
-                if (RuleEngine.RuleMatch(data, rule))
+                if (RuleEngine.RuleMatch(RuleEngine.GetValue(data, (string)rule["scope"]), rule))
                 {
+                    Console.WriteLine($"========= {rule["recommendation_string"]}");
+
                     recommendations.Add((string)rule["recommendation_string"]);
                 }
             }
