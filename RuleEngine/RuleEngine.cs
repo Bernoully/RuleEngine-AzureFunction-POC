@@ -25,7 +25,7 @@ namespace RuleEngine
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
+            log.LogInformation($"C# HTTP trigger function processed a request. {GetEnvironmentVariable("Welcome_message")}");
 
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic data = JsonConvert.DeserializeObject(requestBody);
@@ -34,9 +34,15 @@ namespace RuleEngine
             dynamic rules = data?.rules;
 
             return data != null
-                ? (ActionResult)new OkObjectResult($"Hello, {RuleEngine.RuleEval(ProjectData, rules, log) }")
+                ? (ActionResult)new OkObjectResult($"{GetEnvironmentVariable("Welcome_message")}, {RuleEngine.RuleEval(ProjectData, rules, log) }")
                 : new BadRequestObjectResult("Please pass a data on the query string or in the request body");
         }
+        public static string GetEnvironmentVariable(string name)
+        {
+            return name + ": " +
+                System.Environment.GetEnvironmentVariable(name, EnvironmentVariableTarget.Process);
+        }
+
         public static object GetPropValue(object src, string propName)
         {
             return src.GetType().GetProperty(propName).GetValue(src, null);
