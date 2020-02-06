@@ -25,8 +25,6 @@ namespace RuleEngine
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
             ILogger log)
         {
-            log.LogInformation($"C# HTTP trigger function processed a request. {GetEnvironmentVariable("Welcome_message")}");
-
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
             dynamic data = JsonConvert.DeserializeObject(requestBody);
 
@@ -34,7 +32,7 @@ namespace RuleEngine
             dynamic rules = data?.rules;
 
             return data != null
-                ? (ActionResult)new OkObjectResult($"{GetEnvironmentVariable("Welcome_message")}, {RuleEngine.RuleEval(ProjectData, rules, log) }")
+                ? (ActionResult)new OkObjectResult($"{JsonConvert.SerializeObject(RuleEngine.RuleEval(ProjectData, rules, log))}")
                 : new BadRequestObjectResult("Please pass a data on the query string or in the request body");
         }
         public static string GetEnvironmentVariable(string name)
@@ -85,9 +83,6 @@ namespace RuleEngine
         {
             if (rule.ContainsKey("criteria") && rule["criteria"] != null)
             {
-                //if (!rule.ContainsKey("operator"))
-                //    throw "WTF";
-
                 bool match = true;
                 foreach (var criteria in rule["criteria"])
                     match = RuleEngine.actions[(string)rule["operator"]](match, RuleEngine.RuleMatch(data, criteria));
@@ -104,7 +99,6 @@ namespace RuleEngine
             List<string> recommendations = new List<string>();
             foreach (var rule in rules)
             {
-                log.LogInformation($"{rule}");
                 if (RuleEngine.RuleMatch(RuleEngine.GetValue(data, (string)rule["scope"]), rule))
                 {
                     Console.WriteLine($"========= {rule["recommendation_string"]}");
